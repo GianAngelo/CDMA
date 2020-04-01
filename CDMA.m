@@ -58,7 +58,7 @@ plot(check)
 title('Correct msequence index to match MATLAB')
 
 %Index 157 is the correct msequence starting point
-m_flip_shift = circshift(m_flip,-156);
+m_flip_shift = circshift(m_flip,156);
 verified = m_flip_shift == transpose(PNSEQ);
 
 %% Finding Starting Index
@@ -69,13 +69,13 @@ correlation = xcorr(m_flip_shift,real(downsampled));
 figure
 plot(correlation(1:1080));
 title('M sequence cross correlation with signal')
-%Impulse appears at index 14
-m_final = circshift(m_flip_shift,-86);
+%Impulse appears at index 144
+m_final = circshift(m_flip_shift,-143);
 correlation_2 = xcorr(m_final,real(downsampled));
 figure
 plot(correlation_2(1:1080));
 title('M sequence cross correlation with signal after shift')
-%checking if impulses appear at mod 256
+% checking if impulses appear at mod 256
 
 %% Applying PN Sequencce
 num_frame = length(downsampled)/length_pn;

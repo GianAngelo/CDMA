@@ -1,0 +1,304 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>CDMA</title><meta name="generator" content="MATLAB 9.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2020-04-01"><meta name="DC.source" content="CDMA.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#2">Filter and Donwnsample</a></li><li><a href="#3">PN Sequence Generation</a></li><li><a href="#4">Testing PN Using Matlab's example</a></li><li><a href="#5">Finding Starting Index</a></li><li><a href="#6">Applying PN Sequencce</a></li><li><a href="#7">Fixing Frequency and Phase Shift</a></li><li><a href="#8">Manual BPSK</a></li><li><a href="#9">Walsh Channel Orthogonal Spreading</a></li><li><a href="#10">Characters</a></li></ul></div><pre class="codeinput"><span class="comment">%CDMA Decoding</span>
+<span class="comment">%Gian Angelo Tria</span>
+<span class="comment">%ECE 408: Wireless Communications</span>
+clear;
+clear <span class="string">all</span>;
+clc;
+</pre><h2 id="2">Filter and Donwnsample</h2><pre class="codeinput">load(<span class="string">'Rcvd_Tria .mat'</span>);
+
+<span class="comment">%Root Raise Cosine Filter</span>
+<span class="comment">%Given</span>
+B_RCOS = [.0038;.0052;-.0044;-.0121;-.0023;.0143;.0044;-.0385;-.0563;<span class="keyword">...</span>
+            .0363;.2554;.4968;.6025;.4968;.2554;.0363;-.0563;-.0385;<span class="keyword">...</span>
+            .0044;.0143;-.0023;-.0121;-.0044;.0052;.0038];
+filtered = filter(B_RCOS,1,Rcvd); <span class="comment">%%Root Raised Cosine filter used to</span>
+<span class="comment">%Downsampling</span>
+downsampled = downsample(filtered,4);
+
+scatterplot(Rcvd)
+title(<span class="string">'Recieved Signal'</span>)
+scatterplot(filtered)
+title(<span class="string">'Filtered Signal'</span>)
+scatterplot(downsampled)
+title(<span class="string">'Downsampled and Filtered Signal'</span>)
+</pre><img vspace="5" hspace="5" src="CDMA_01.png" alt=""> <img vspace="5" hspace="5" src="CDMA_02.png" alt=""> <img vspace="5" hspace="5" src="CDMA_03.png" alt=""> <h2 id="3">PN Sequence Generation</h2><pre class="codeinput"><span class="comment">% PN Sequence Galois (same sequence)</span>
+length_pn=255; <span class="comment">%length of 1 frame</span>
+m = zeros(1,255);<span class="comment">%preallocating for for loop</span>
+a = [0 0 0 0 0 0 0 1]; <span class="comment">%initial condition</span>
+<span class="keyword">for</span> i = 1:length_pn
+x_1 = mod(a(2)+a(1),2);
+x_6 = mod(a(7)+a(1),2);
+x_7 = mod(a(8)+a(1),2);
+a = circshift(a,-1);  <span class="comment">%Shifts registers first then applies changes from XOR</span>
+a(1) = x_1;
+a(6) = x_6;
+a(7) = x_7;
+m(i)= a(1);
+<span class="keyword">end</span>
+m_flip = flip(m); <span class="comment">%Flip m was the same sequence as the PN from Matlab</span>
+</pre><h2 id="4">Testing PN Using Matlab's example</h2><pre class="codeinput">PN = [8 7 6 1 0];
+PNGEN = comm.PNSequence(<span class="string">'Polynomial'</span>, PN, <span class="string">'InitialConditions'</span>, 1, <span class="keyword">...</span>
+    <span class="string">'SamplesPerFrame'</span>, 2^8-1, <span class="string">'Mask'</span>, de2bi(1,8));
+PNSEQ = PNGEN();
+
+<span class="comment">%Checking which index to shift to to be the same</span>
+m_flip_check = m_flip;
+<span class="keyword">for</span> i = 1:length(m_flip_check)
+    check(i) = sum(m_flip_check == transpose(PNSEQ));
+    m_flip_check = circshift(m_flip_check,1);
+<span class="keyword">end</span>
+verify = max(check)==255;
+figure
+plot(check)
+title(<span class="string">'Correct msequence index to match MATLAB'</span>)
+
+<span class="comment">%Index 157 is the correct msequence starting point</span>
+m_flip_shift = circshift(m_flip,-156);
+verified = m_flip_shift == transpose(PNSEQ);
+</pre><img vspace="5" hspace="5" src="CDMA_04.png" alt=""> <h2 id="5">Finding Starting Index</h2><pre class="codeinput">figure
+plot(xcorr(m_flip_shift,m_flip_shift));
+title(<span class="string">'M sequence cross correlation with itself'</span>)
+correlation = xcorr(m_flip_shift,real(downsampled));
+figure
+plot(correlation(1:1080));
+title(<span class="string">'M sequence cross correlation with signal'</span>)
+<span class="comment">%Impulse appears at index 14</span>
+m_final = circshift(m_flip_shift,-86);
+correlation_2 = xcorr(m_final,real(downsampled));
+figure
+plot(correlation_2(1:1080));
+title(<span class="string">'M sequence cross correlation with signal after shift'</span>)
+<span class="comment">%checking if impulses appear at mod 256</span>
+</pre><img vspace="5" hspace="5" src="CDMA_05.png" alt=""> <img vspace="5" hspace="5" src="CDMA_06.png" alt=""> <img vspace="5" hspace="5" src="CDMA_07.png" alt=""> <h2 id="6">Applying PN Sequencce</h2><pre class="codeinput">num_frame = length(downsampled)/length_pn;
+x=1;
+post_pn = repmat(m_final,1,num_frame).*downsampled; <span class="comment">%repeating m to be size of downsampled</span>
+scatterplot(post_pn);
+title(<span class="string">'Signal after applying PN Sequence'</span>)
+</pre><img vspace="5" hspace="5" src="CDMA_08.png" alt=""> <h2 id="7">Fixing Frequency and Phase Shift</h2><pre class="codeinput">sign = ((real(post_pn)&gt;0)-.5).*2;<span class="comment">%Assuming that the shift is not greater than pi</span>
+fixed = sign.*(abs(post_pn));
+scatterplot(fixed)
+title(<span class="string">'Signal after fixing frequency and phase shift'</span>)
+</pre><img vspace="5" hspace="5" src="CDMA_09.png" alt=""> <h2 id="8">Manual BPSK</h2><pre class="codeinput">o_negative = -1*(fixed &lt; -.5); <span class="comment">%Fixed must be converted to values -1,0,1 for Walsh</span>
+o_positive = fixed &gt;.5;
+BPSK_sig = o_negative+o_positive;
+scatterplot(BPSK_sig)
+title(<span class="string">'Manually converted to BPSK form'</span>)
+</pre><img vspace="5" hspace="5" src="CDMA_10.png" alt=""> <h2 id="9">Walsh Channel Orthogonal Spreading</h2><pre class="codeinput">N = 8;  <span class="comment">% Length of Walsh (Hadamard) functions</span>
+hadamardMatrix = hadamard(N);
+
+resized = reshape(BPSK_sig,[length(BPSK_sig)/8 8]); <span class="comment">%resizing to multiply by hadamard</span>
+unwalsh = resized*hadamardMatrix;
+
+o_negative = -1*(unwalsh(:,6) &lt; 0); <span class="comment">%each column is a channel, want channel 5 so index 6</span>
+o_positive = unwalsh(:,6) &gt;= 0;
+demod = o_negative+o_positive; <span class="comment">%Changing into a form that can be BPSKdemod</span>
+out = BPSKdemod(demod);
+scatterplot(out)
+title(<span class="string">'Demodulated Signal'</span>)
+</pre><img vspace="5" hspace="5" src="CDMA_11.png" alt=""> <h2 id="10">Characters</h2><pre class="codeinput">out_2 = reshape(transpose(out(1:760)),[8 95]); <span class="comment">%reshaping to separate bytes</span>
+out_2 = transpose(out_2);
+<span class="keyword">for</span> i = 1:95
+c(i) = char(bi2de(out_2(i,:),<span class="string">'left-msb'</span>)); <span class="comment">%not sure if left-msb or right-msb</span>
+<span class="keyword">end</span>
+<span class="keyword">for</span> i = 1:95
+c_2(i) = char(bi2de(out_2(i,:),<span class="string">'right-msb'</span>));
+<span class="keyword">end</span>
+disp(c)
+disp(c_2)
+</pre><pre class="codeoutput">  * D @HRB  &#146; S "  $   J&curren;&#138; @R&#148;   	@      &#136;    &#144;&Agrave;   &Agrave;&Agrave;        	  &#132; !&#130; @   &not;&#145;&#130;  "  '&#137;&#129;&#130;    
+@&#128;T $ "   JB( I &Ecirc; D$&#136;&#128;(R%Q&#136; J)   &#144;  @    +   @	  &#128;         &#144; @!@&#132;A&#128;5&#137;A &nbsp;D  &auml;&#145;&#129;A    
+</pre><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%CDMA Decoding
+%Gian Angelo Tria
+%ECE 408: Wireless Communications
+clear;
+clear all;
+clc;
+%% Filter and Donwnsample
+load('Rcvd_Tria .mat');
+
+%Root Raise Cosine Filter
+%Given
+B_RCOS = [.0038;.0052;-.0044;-.0121;-.0023;.0143;.0044;-.0385;-.0563;... 
+            .0363;.2554;.4968;.6025;.4968;.2554;.0363;-.0563;-.0385;... 
+            .0044;.0143;-.0023;-.0121;-.0044;.0052;.0038];
+filtered = filter(B_RCOS,1,Rcvd); %%Root Raised Cosine filter used to 
+%Downsampling
+downsampled = downsample(filtered,4);
+
+scatterplot(Rcvd)
+title('Recieved Signal')
+scatterplot(filtered)
+title('Filtered Signal')
+scatterplot(downsampled)
+title('Downsampled and Filtered Signal')
+%% PN Sequence Generation
+
+% PN Sequence Galois (same sequence) 
+length_pn=255; %length of 1 frame 
+m = zeros(1,255);%preallocating for for loop
+a = [0 0 0 0 0 0 0 1]; %initial condition
+for i = 1:length_pn
+x_1 = mod(a(2)+a(1),2);
+x_6 = mod(a(7)+a(1),2);
+x_7 = mod(a(8)+a(1),2);
+a = circshift(a,-1);  %Shifts registers first then applies changes from XOR
+a(1) = x_1;
+a(6) = x_6;
+a(7) = x_7;
+m(i)= a(1);
+end
+m_flip = flip(m); %Flip m was the same sequence as the PN from Matlab
+
+%% Testing PN Using Matlab's example
+PN = [8 7 6 1 0];
+PNGEN = comm.PNSequence('Polynomial', PN, 'InitialConditions', 1, ...
+    'SamplesPerFrame', 2^8-1, 'Mask', de2bi(1,8));
+PNSEQ = PNGEN();
+ 
+%Checking which index to shift to to be the same 
+m_flip_check = m_flip;
+for i = 1:length(m_flip_check)
+    check(i) = sum(m_flip_check == transpose(PNSEQ));
+    m_flip_check = circshift(m_flip_check,1);
+end
+verify = max(check)==255;
+figure
+plot(check)
+title('Correct msequence index to match MATLAB')
+
+%Index 157 is the correct msequence starting point
+m_flip_shift = circshift(m_flip,-156);
+verified = m_flip_shift == transpose(PNSEQ);
+
+%% Finding Starting Index
+figure
+plot(xcorr(m_flip_shift,m_flip_shift));
+title('M sequence cross correlation with itself')
+correlation = xcorr(m_flip_shift,real(downsampled));
+figure
+plot(correlation(1:1080));
+title('M sequence cross correlation with signal')
+%Impulse appears at index 14
+m_final = circshift(m_flip_shift,-86);
+correlation_2 = xcorr(m_final,real(downsampled));
+figure
+plot(correlation_2(1:1080));
+title('M sequence cross correlation with signal after shift')
+%checking if impulses appear at mod 256
+
+%% Applying PN Sequencce
+num_frame = length(downsampled)/length_pn;
+x=1;
+post_pn = repmat(m_final,1,num_frame).*downsampled; %repeating m to be size of downsampled
+scatterplot(post_pn);
+title('Signal after applying PN Sequence')
+%% Fixing Frequency and Phase Shift
+sign = ((real(post_pn)>0)-.5).*2;%Assuming that the shift is not greater than pi
+fixed = sign.*(abs(post_pn));
+scatterplot(fixed)
+title('Signal after fixing frequency and phase shift')
+%% Manual BPSK
+o_negative = -1*(fixed < -.5); %Fixed must be converted to values -1,0,1 for Walsh
+o_positive = fixed >.5;
+BPSK_sig = o_negative+o_positive;
+scatterplot(BPSK_sig)
+title('Manually converted to BPSK form')
+%% Walsh Channel Orthogonal Spreading
+
+N = 8;  % Length of Walsh (Hadamard) functions
+hadamardMatrix = hadamard(N);
+
+resized = reshape(BPSK_sig,[length(BPSK_sig)/8 8]); %resizing to multiply by hadamard
+unwalsh = resized*hadamardMatrix;
+
+o_negative = -1*(unwalsh(:,6) < 0); %each column is a channel, want channel 5 so index 6
+o_positive = unwalsh(:,6) >= 0;
+demod = o_negative+o_positive; %Changing into a form that can be BPSKdemod
+out = BPSKdemod(demod);
+scatterplot(out)
+title('Demodulated Signal')
+
+%% Characters 
+out_2 = reshape(transpose(out(1:760)),[8 95]); %reshaping to separate bytes
+out_2 = transpose(out_2);
+for i = 1:95
+c(i) = char(bi2de(out_2(i,:),'left-msb')); %not sure if left-msb or right-msb
+end
+for i = 1:95
+c_2(i) = char(bi2de(out_2(i,:),'right-msb'));
+end
+disp(c)
+disp(c_2)
+
+##### SOURCE END #####
+--></body></html>

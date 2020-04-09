@@ -15,108 +15,63 @@ B_RCOS = [.0038;.0052;-.0044;-.0121;-.0023;.0143;.0044;-.0385;-.0563;...
 filtered = filter(B_RCOS,1,Rcvd); %%Root Raised Cosine filter used to 
 %Downsampling
 downsampled = downsample(filtered,4);
-
-scatterplot(Rcvd)
-title('Recieved Signal')
-scatterplot(filtered)
-title('Filtered Signal')
-scatterplot(downsampled)
-title('Downsampled and Filtered Signal')
-%% PN Sequence Generation
-
-% PN Sequence Galois (same sequence) 
-length_pn=255; %length of 1 frame 
-m = zeros(1,255);%preallocating for for loop
-a = [0 0 0 0 0 0 0 1]; %initial condition
-for i = 1:length_pn
-x_1 = mod(a(2)+a(1),2);
-x_6 = mod(a(7)+a(1),2);
-x_7 = mod(a(8)+a(1),2);
-a = circshift(a,-1);  %Shifts registers first then applies changes from XOR
-a(1) = x_1;
-a(6) = x_6;
-a(7) = x_7;
-m(i)= a(1);
-end
-m_flip = flip(m); %Flip m was the same sequence as the PN from Matlab
-
-%% Testing PN Using Matlab's example
-PN = [8 7 6 1 0];
-PNGEN = comm.PNSequence('Polynomial', PN, 'InitialConditions', 1, ...
-    'SamplesPerFrame', 2^8-1, 'Mask', de2bi(1,8));
-PNSEQ = PNGEN();
- 
-%Checking which index to shift to to be the same 
-m_flip_check = m_flip;
-for i = 1:length(m_flip_check)
-    check(i) = sum(m_flip_check == transpose(PNSEQ));
-    m_flip_check = circshift(m_flip_check,1);
-end
-verify = max(check)==255;
-figure
-plot(check)
-title('Correct msequence index to match MATLAB')
-
-%Index 157 is the correct msequence starting point
-m_flip_shift = circshift(m_flip,156);
-verified = m_flip_shift == transpose(PNSEQ);
+%% M Sequence Generation
+taps = [1 1 1 0 0 0 0 1];
+m_flip_shift = m_seq(taps);
 
 %% Finding Starting Index
-figure
-plot(xcorr(m_flip_shift,m_flip_shift));
-title('M sequence cross correlation with itself')
-correlation = xcorr(m_flip_shift,real(downsampled));
-figure
-plot(correlation(1:1080));
-title('M sequence cross correlation with signal')
-%Impulse appears at index 144
-m_final = circshift(m_flip_shift,-143);
-correlation_2 = xcorr(m_final,real(downsampled));
-figure
-plot(correlation_2(1:1080));
-title('M sequence cross correlation with signal after shift')
-% checking if impulses appear at mod 256
+indexing=filter(fliplr(reshape([1-2*m_flip_shift;zeros(3,length(m_flip_shift))],1,[])),1,Rcvd);
+figure;
+mag_indexing = abs(indexing);
+plot(mag_indexing)
+title('Correlation Between Msequence and Signal')
 
 %% Applying PN Sequencce
-num_frame = length(downsampled)/length_pn;
-x=1;
-post_pn = repmat(m_final,1,num_frame).*downsampled; %repeating m to be size of downsampled
+downsampled_new = Rcvd(1032:4:end);
+repeat_m = repmat(1-2*m_flip_shift,1,ceil(length(downsampled_new)/255));
+post_pn = downsampled_new.*repeat_m(1:length(downsampled_new)); 
 scatterplot(post_pn);
 title('Signal after applying PN Sequence')
 %% Fixing Frequency and Phase Shift
-sign = ((real(post_pn)>0)-.5).*2;%Assuming that the shift is not greater than pi
-fixed = sign.*(abs(post_pn));
-scatterplot(fixed)
-title('Signal after fixing frequency and phase shift')
-%% Manual BPSK
-o_negative = -1*(fixed < -.5); %Fixed must be converted to values -1,0,1 for Walsh
-o_positive = fixed >.5;
-BPSK_sig = o_negative+o_positive;
-scatterplot(BPSK_sig)
-title('Manually converted to BPSK form')
+angle_post_pn = angle(post_pn);
+rotator = cos(-angle_post_pn) + 1j*sin(-angle_post_pn);
+fixed = rotator.*post_pn; % At this point everything is on real axis
+scatterplot(fixed);
+title('Frequency Fixed')
 %% Walsh Channel Orthogonal Spreading
-
-N = 8;  % Length of Walsh (Hadamard) functions
-hadamardMatrix = hadamard(N);
-
-resized = reshape(BPSK_sig,[length(BPSK_sig)/8 8]); %resizing to multiply by hadamard
-unwalsh = resized*hadamardMatrix;
-
-o_negative = -1*(unwalsh(:,6) < 0); %each column is a channel, want channel 5 so index 6
-o_positive = unwalsh(:,6) >= 0;
-demod = o_negative+o_positive; %Changing into a form that can be BPSKdemod
-out = BPSKdemod(demod);
-scatterplot(out)
-title('Demodulated Signal')
-
-%% Characters 
-out_2 = reshape(transpose(out(1:760)),[8 95]); %reshaping to separate bytes
-out_2 = transpose(out_2);
-for i = 1:95
-c(i) = char(bi2de(out_2(i,:),'left-msb')); %not sure if left-msb or right-msb
+h=hadamard(8);
+% Find number of complete frames and extract it
+copies=(floor(length(fixed)./255));
+fixed_new=fixed(1:(copies*255));
+Reshape_1=reshape(fixed_new,255,[]);
+Reshape_2=reshape(Reshape_1(1:192,:),[],8);
+% Each column has 8 chips
+Reshape_3=reshape(Reshape_2,8,[]);
+decoded = Reshape_3.'*h;
+figure
+imagesc(abs(decoded))
+title('Decoded Signal After Walsh')
+demod = pskdemod(decoded,2);
+%% Decoding
+%Binary to Decimal and then Decimal to Character
+binary = transpose(demod(:,6));
+for i = 1:length(binary)/8
+    characters(i) = bi2de(binary((i-1)*8+1:i*8),'right-msb');
 end
-for i = 1:95
-c_2(i) = char(bi2de(out_2(i,:),'right-msb'));
+decoded_message = char(characters)
+
+%% Functions
+function [m_sequence] = m_seq(poly)
+    shift = zeros(1, length(poly));
+    shift(end) = 1;
+    m_sequence = zeros(1,255);
+    m_sequence(end) = shift(length(shift));
+    for i = 1:length(m_sequence)-1
+        shift_end = shift(length(shift));
+        for j = length(shift):-1:2
+            shift(j) = mod(shift(j-1) + poly(j)*shift_end, 2);
+        end
+        shift(1) = shift_end;
+        m_sequence(length(m_sequence) - i) = shift(end);
+    end
 end
-disp(c)
-disp(c_2)
